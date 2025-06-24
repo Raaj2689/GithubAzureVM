@@ -2,36 +2,63 @@ name: Terraform Deployment
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
-  deploy:
+  terraform-deploy:
+    name: "Terraform Deploy"
     runs-on: ubuntu-latest
+    environment: Test
+    
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./terraform  # Assuming Terraform files are in a subdirectory
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # Updated to latest version
 
-      - name: Azure Login using GitHub Secret
-        uses: azure/login@v1
+      - name: Configure Azure credentials
+        uses: azure/login@v2  # Updated to v2
         with:
-          creds: ${{ secrets.MY_AZ_SECRETS }}
+          creds: ${{ secrets.MY_AZ_SECRETS }}  # More descriptive secret name
 
-      - name: Set up Terraform
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5  # Or your preferred version
+          terraform_version: "1.7.5"
+          terraform_wrapper: false
 
-      - name: Terraform Init
-        run: terraform init
+      - name: Cache Terraform modules and providers
+        uses: actions/cache@v3
+        with:
+          path: |
+            .terraform.lock.hcl
+            .terraform/providers
+            .terraform/modules
+          key: ${{ runner.os }}-terraform-${{ hashFiles('**/.terraform.lock.hcl') }}
+          restore-keys: |
+            ${{ runner.os }}-terraform-
 
-      - name: Terraform Validate
+      - name: Initialize Terraform backend
+        run: terraform init -input=false -backend-config=backend.hcl  # Explicit backend config
+
+      - name: Validate Terraform configuration
         run: terraform validate
 
-      - name: Terraform Plan
-        run: terraform plan
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve
+      - name: Generate execution plan
+        id: plan
+        run: |
+          terraform plan -no-color -input=false -detailed-exitcode -out=tfplan || \
+            ([ $? -eq 2 ] && echo "::warning::Terraform plan detected changes" && exit 0)
+          
+      - name : Apply Terraform changes (if approved)
+        if : steps.plan.outcome == 'success'
+        run : terraform apply -auto-approve -input=false tfplan
+        
+      # Post job cleanup (optional)
+      - name : Cleanup sensitive files  
+        if : always()
+        run : rm -f tfplan *.tfvars || true  
