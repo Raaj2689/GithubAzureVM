@@ -1,37 +1,40 @@
-name: Terraform Deployment
+name: Terraform Plan and Apply - Azure
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
-  deploy:
+  terraform:
+    name: Terraform Plan & Apply
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Azure Login using GitHub Secret
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.MY_AZ_SECRETS }}
-
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.7.5  # Or your preferred version
+          terraform_wrapper: false
 
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Validate
-        run: terraform validate
+      - name: Parse MY_AZ_SECRETS and create tfvars file
+        run: |
+          echo "${{ secrets.MY_AZ_SECRETS }}" > raw_secrets.env
+          export $(cat raw_secrets.env | xargs)
+          cat > secrets.tfvars <<EOF
+          client_id       = "${client_id}"
+          client_secret   = "${client_secret}"
+          tenant_id       = "${tenant_id}"
+          subscription_id = "${subscription_id}"
+          EOF
 
       - name: Terraform Plan
-        run: terraform plan
+        run: terraform plan -var-file="secrets.tfvars" -out=tfplan
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve tfplan
