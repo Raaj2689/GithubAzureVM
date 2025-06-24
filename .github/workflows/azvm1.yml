@@ -22,10 +22,14 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Parse MY_AZ_SECRETS and create tfvars file
+      - name: Parse MY_AZ_SECRETS JSON and create tfvars file
         run: |
-          echo "${{ secrets.MY_AZ_SECRETS }}" > raw_secrets.env
-          export $(cat raw_secrets.env | xargs)
+          echo '${{ secrets.MY_AZ_SECRETS }}' > secret.json
+          client_id=$(jq -r '.clientId' secret.json)
+          cclient_secret=$(jq -r '.clientSecret' secret.json)
+          tenant_id=$(jq -r '.tenantId' secret.json)
+          subscription_id=$(jq -r '.subscriptionId' secret.json)
+
           cat > secrets.tfvars <<EOF
           client_id       = "${client_id}"
           client_secret   = "${client_secret}"
