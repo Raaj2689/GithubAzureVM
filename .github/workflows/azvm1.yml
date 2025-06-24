@@ -1,64 +1,40 @@
-name: Terraform Deployment
+name: Terraform Plan and Apply - Azure
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
-  terraform-deploy:
-    name: "Terraform Deploy"
+  terraform:
+    name: Terraform Plan & Apply
     runs-on: ubuntu-latest
-    environment: Test
-    
-    defaults:
-      run:
-        shell: bash
-        working-directory: ./terraform  # Assuming Terraform files are in a subdirectory
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4  # Updated to latest version
+        uses: actions/checkout@v3
 
-      - name: Configure Azure credentials
-        uses: azure/login@v2  # Updated to v2
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
         with:
-          creds: ${{ secrets.MY_AZ_SECRETS }}  # More descriptive secret name
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.7.5"
           terraform_wrapper: false
 
-      - name: Cache Terraform modules and providers
-        uses: actions/cache@v3
-        with:
-          path: |
-            .terraform.lock.hcl
-            .terraform/providers
-            .terraform/modules
-          key: ${{ runner.os }}-terraform-${{ hashFiles('**/.terraform.lock.hcl') }}
-          restore-keys: |
-            ${{ runner.os }}-terraform-
+      - name: Terraform Init
+        run: terraform init
 
-      - name: Initialize Terraform backend
-        run: terraform init -input=false -backend-config=backend.hcl  # Explicit backend config
-
-      - name: Validate Terraform configuration
-        run: terraform validate
-
-      - name: Generate execution plan
-        id: plan
+      - name: Parse MY_AZ_SECRETS and create tfvars file
         run: |
-          terraform plan -no-color -input=false -detailed-exitcode -out=tfplan || \
-            ([ $? -eq 2 ] && echo "::warning::Terraform plan detected changes" && exit 0)
-          
-      - name : Apply Terraform changes (if approved)
-        if : steps.plan.outcome == 'success'
-        run : terraform apply -auto-approve -input=false tfplan
-        
-      # Post job cleanup (optional)
-      - name : Cleanup sensitive files  
-        if : always()
-        run : rm -f tfplan *.tfvars || true  
+          echo "${{ secrets.MY_AZ_SECRETS }}" > raw_secrets.env
+          export $(cat raw_secrets.env | xargs)
+          cat > secrets.tfvars <<EOF
+          client_id       = "${client_id}"
+          client_secret   = "${client_secret}"
+          tenant_id       = "${tenant_id}"
+          subscription_id = "${subscription_id}"
+          EOF
+
+      - name: Terraform Plan
+        run: terraform plan -var-file="secrets.tfvars" -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
