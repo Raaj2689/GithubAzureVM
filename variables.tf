@@ -14,3 +14,7 @@ variable "location" {
   default     = "Central US"
   description = "Azure region"
 }
+variable "client_id" {}
+variable "client_secret" {}
+variable "tenant_id" {}
+variable "subscription_id" {}
