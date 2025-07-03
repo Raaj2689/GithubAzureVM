@@ -29,12 +29,12 @@ jobs:
       - name: Azure Login
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ secrets.MY_AZ_SECRETS }}
 
       - name: Terraform Init
         run: terraform init
 
-      - name: Create Dummy VM Resource for Import
+      - name: Create Minimal VM Resource for Import
         run: |
           cat <<EOF > main.tf
           provider "azurerm" {
@@ -78,7 +78,7 @@ jobs:
       - name: Terraform Re-init After Adding Resource
         run: terraform init
 
-      - name: Import Existing VM to Terraform State
+      - name: Import Existing VM into Terraform State
         run: |
           terraform import azurerm_virtual_machine.target_vm \
           /subscriptions/${{ github.event.inputs.subscription_id }}/resourceGroups/${{ github.event.inputs.resource_group }}/providers/Microsoft.Compute/virtualMachines/${{ github.event.inputs.vm_name }}
