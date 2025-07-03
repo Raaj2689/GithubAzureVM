@@ -23,3 +23,6 @@ override.tf.json
 
 # IDE settings
 .vscode/
+
+# Lock Files
+*.lock.hcl
