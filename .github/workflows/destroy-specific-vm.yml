@@ -1,0 +1,87 @@
+name: Destroy Specific Azure VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      subscription_id:
+        description: 'Azure Subscription ID'
+        required: true
+      resource_group:
+        description: 'Azure Resource Group Name'
+        required: true
+      vm_name:
+        description: 'Azure VM Name to Destroy'
+        required: true
+
+jobs:
+  destroy-vm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_wrapper: false
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Create Dummy VM Resource for Import
+        run: |
+          cat <<EOF > main.tf
+          provider "azurerm" {
+            features {}
+            subscription_id = "${{ github.event.inputs.subscription_id }}"
+          }
+
+          resource "azurerm_virtual_machine" "target_vm" {
+            name                  = "${{ github.event.inputs.vm_name }}"
+            resource_group_name   = "${{ github.event.inputs.resource_group }}"
+            location              = "eastus"
+            network_interface_ids = []
+            vm_size               = "Standard_DS1_v2"
+
+            os_profile {
+              computer_name  = "temp"
+              admin_username = "dummy"
+              admin_password = "DummyPassword123!"
+            }
+
+            os_profile_windows_config {
+              provision_vm_agent = false
+            }
+
+            storage_os_disk {
+              name              = "dummy"
+              caching           = "ReadWrite"
+              create_option     = "FromImage"
+              managed_disk_type = "Standard_LRS"
+            }
+
+            storage_image_reference {
+              publisher = "MicrosoftWindowsServer"
+              offer     = "WindowsServer"
+              sku       = "2019-Datacenter"
+              version   = "latest"
+            }
+          }
+          EOF
+
+      - name: Terraform Re-init After Adding Resource
+        run: terraform init
+
+      - name: Import Existing VM to Terraform State
+        run: |
+          terraform import azurerm_virtual_machine.target_vm \
+          /subscriptions/${{ github.event.inputs.subscription_id }}/resourceGroups/${{ github.event.inputs.resource_group }}/providers/Microsoft.Compute/virtualMachines/${{ github.event.inputs.vm_name }}
+
+      - name: Destroy the VM
+        run: terraform destroy -target=azurerm_virtual_machine.target_vm -auto-approve
