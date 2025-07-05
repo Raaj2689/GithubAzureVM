@@ -21,9 +21,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Remove provider and variable files
+      - name: Remove provider, variable, and tfvars files
         run: |
-          rm -f providers1.tf providers.tf variables.tf
+          rm -f providers1.tf providers.tf variables.tf terraform.tfvars
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
