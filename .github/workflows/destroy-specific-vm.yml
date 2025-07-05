@@ -75,6 +75,10 @@ jobs:
           }
           EOF
 
+      - name: Remove other provider files
+        run: |
+          rm -f providers1.tf providers.tf
+
       - name: Terraform Re-init After Adding Resource
         run: terraform init
 
