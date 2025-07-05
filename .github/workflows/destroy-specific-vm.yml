@@ -21,6 +21,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Remove provider and variable files
+        run: |
+          rm -f providers1.tf providers.tf variables.tf
+
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
         with:
@@ -75,10 +79,6 @@ jobs:
           }
           EOF
 
-      - name: Remove other provider files
-        run: |
-          rm -f providers1.tf providers.tf
-
       - name: Terraform Re-init After Adding Resource
         run: terraform init
 
@@ -89,6 +89,3 @@ jobs:
 
       - name: Destroy the VM
         run: terraform destroy -target=azurerm_virtual_machine.target_vm -auto-approve
-
-      - name: Remove variables.tf
-        run: rm -f variables.tf
