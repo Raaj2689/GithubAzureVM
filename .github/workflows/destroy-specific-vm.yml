@@ -89,3 +89,6 @@ jobs:
 
       - name: Destroy the VM
         run: terraform destroy -target=azurerm_virtual_machine.target_vm -auto-approve
+
+      - name: List all .tf files (debug)
+        run: ls -l *.tf || true
